@@ -1,5 +1,5 @@
 from tkinter import *
-from selenium import webdriver
+from seleniumwire import webdriver
 from openpyxl import load_workbook
 import time
 import random
@@ -8,9 +8,9 @@ import json
 import threading
 import traceback
 
-t_m_c = 1.5
+# t_m_c = 1.5
 
-# t_m_c = 5
+t_m_c = 5
 
 
 class Worker:
@@ -209,9 +209,8 @@ class Worker:
                     # CHECK ON REG
 
             # CHECK ON REG
-            type_user = 'new'
             while 1:
-                if COPY:break
+                if COPY: break
                 self.status_label.config(text = 'Проверка на регистрацию')
                 time.sleep(t_m_c * 2)
                 try:
@@ -386,6 +385,7 @@ class Worker:
                             if PLAN_TYPE == PLAN_TYPES[i + 1]:
                                 if b.text == 'שכפל מנוי':
                                     b.click()
+                                    time.sleep(t_m_c * 0.3)
                                     break
                             else:
                                 if b.text == 'הוסף מנוי נוסף':
@@ -456,7 +456,7 @@ class Worker:
 
         # CITY,ADDR
         while 1:
-            self.status_label.config(text = 'Ввод адресса')
+            self.status_label.config(text = 'Ввод адреса')
             time.sleep(t_m_c * 0.5)
             try:
                 table = self.web_driver.find_element_by_tag_name('app-personaldetails')
@@ -489,7 +489,6 @@ class Worker:
                             elif i + 1 == len(parametr):
                                 options[0].click()
                                 break
-                        # except:pass
                     time.sleep(t_m_c * 1)
                 break
             except:
