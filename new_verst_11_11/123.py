@@ -1,13 +1,4 @@
-from tkinter import *
-from seleniumwire import webdriver
-from openpyxl import load_workbook
-import time
-import random
-import re
-import json
-import threading
-import traceback
-
+from config import *
 # t_m_c = 1.5
 
 t_m_c = 5
@@ -1132,7 +1123,6 @@ try:
                 break
             nm += 1
         sort_keys.append(sort)
-
     def load_wb():
         wb = load_workbook(r'123.xlsx')
         for i in wb:
@@ -1150,7 +1140,7 @@ try:
                 'index': index_table
             })
             index_table += count_lines
-
+        print(sort_keys)
         for i in lines:
             for ii in range(4):
                 for keys in sort_keys[ii]:
