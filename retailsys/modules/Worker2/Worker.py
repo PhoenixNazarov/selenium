@@ -10,6 +10,7 @@ from modules.data.JsonSettings import SettingsJson
 from modules.data.Sheets import ErrorsSheetBase, ErrorsSheetCollect
 from modules.data.Log import Log
 from modules.Worker2 import MyWebDriver
+from modules.Objects import *
 
 
 @mail_exception
@@ -177,69 +178,62 @@ class Worker(Log):
 
     def finder_error(self, function):
         def wrapper(*args, **kwargs):
-            errors = ["invalid-feedback"]
-            for i in errors:
-                self.web_driver.find_elements(By.CLASS_NAME, "invalid-feedback")
+            element = self.web_driver.find_elements(By.CLASS_NAME, "invalid-feedback")
+            if element:
+                pass
+
+            res = function(*args, **kwargs)
+
+            element = self.web_driver.find_elements(By.CLASS_NAME, "invalid-feedback")
+            if element:
+                pass
+
+            return res
 
         return wrapper
 
-    def time_sleep(self, count, element_finder=None, can_skip=False):
-        time_start = time.time()
-        match self.type_sleep, count, element_finder, can_skip:
-            case "last", count, element_finder, can_skip:
-                time.sleep(count * TIME_DELAY_PERC)
-            case "fast", count, None, can_skip:
-                if not can_skip:
-                    time.sleep(count * TIME_DELAY_PERC)
-            case "fast", count, element_finder, can_skip:
-                start = time.time()
-                while 1:
-                    if time.time() - start > MAX_TIME_WAIT:
-                        self.write_log('line_delay_max_time', json.dumps({
-                            "time_delta": round(time.time() - time_start, 5),
-                            "line_status": self.Status.get_status(),
-                            "TYPE_SLEEP": self.type_sleep,
-                            "can_skip": can_skip,
-                            "count": count,
-                            "element_finder": 0 if element_finder is None else 1
-                        }), self.numb)
-                        raise FinderTooTime(self.numb, MAX_TIME_WAIT)
-                    try:
-                        return element_finder()
-                    except:
-                        pass
+    @staticmethod
+    def smart_memory(function):
+        mem = Memory()
 
-        self.write_log('line_delay', json.dumps({
-            "time_delta": round(time.time() - time_start, 5),
-            "line_status": self.Status.get_status(),
-            "TYPE_SLEEP": self.type_sleep,
-            "can_skip": can_skip,
-            "count": count,
-            "element_finder": 0 if element_finder is None else 1
-        }), self.numb)
+        def wrapper(*args, **kwargs):
+            global TYPE_USER, COPY
+            # when need break
+            name = args[0].__name__
+            if not mem.check_allow(name):
+                return
+
+            res = function(*args, **kwargs)
+            if name == 'check_on_reg':
+                TYPE_USER = res
+            elif name == 'end_action':
+                COPY = res
+
+            return res
+
+        return wrapper
 
     @UI_control
     @finder_error
+    @smart_memory
     def pull(self, function):
         function()
 
     @elements_exception
     def plan(self, line: Line):
         wd = self.web_driver
-        ts = self.time_sleep
 
         def open_link():
-            wd.get('https://retailsys.hotnet.net.il/HotMobile/HMPurchase')
-            ts(2, can_skip = True)
+            wd.get('https://retailsys.hotnet.net.il/HotMobile/HMPurchase', count = 2, side = False, important = False)
 
         # CHOOSE PLANS
         def choose_plans():
-            plans_type = ts(0.5, lambda: wd.find_elements(By.CLASS_NAME, 'plan-type'))
+            plans_type = wd.find_elements(By.CLASS_NAME, 'plan-type', count = 0.5)
             plans_type[PLAN_TYPE].find_element(By.XPATH, '..').click()
 
         # CARD
         def button_card():
-            all_cards = ts(0.5, lambda: wd.find_elements(By.CLASS_NAME, 'card-title'))
+            all_cards = wd.find_elements(By.CLASS_NAME, 'card-title', count = 0.5)
             for ci in all_cards:
                 if ci.text == NAME_CARD:
                     but = ci.find_element(By.XPATH, '..').find_element(By.XPATH, '..')
@@ -248,87 +242,83 @@ class Worker(Log):
         # CHECK ON REG
         def check_on_reg():
             global TYPE_USER
-            if i == 0:
-                # LEFT_BUTTON
-                dialog = ts(2, lambda: wd.find_element(By.TAG_NAME, 'client-eligibility'))
-                dialog.find_elements(By.TAG_NAME, 'h2')[1].click()
+            # LEFT_BUTTON
+            dialog = wd.find_element(By.TAG_NAME, 'client-eligibility', count = 2)
+            dialog.find_elements(By.TAG_NAME, 'h2')[1].click()
 
-                # CHECK ALREADY REG
-                dialog = wd.find_element(By.TAG_NAME, 'client-eligibility')
-                dialog.find_element(By.TAG_NAME, 'input').send_keys(line.PASSPORT)
-                dialog.find_elements(By.TAG_NAME, 'button')[0].click()
-                ts(2, can_skip = False)
+            # CHECK ALREADY REG
+            dialog = wd.find_element(By.TAG_NAME, 'client-eligibility')
+            dialog.find_element(By.TAG_NAME, 'input').send_keys(line.PASSPORT)
+            dialog.find_element(By.TAG_NAME, 'button', count = 2, important = False, command = 'click')  # [0].click()
 
-                TYPE_USER = 'undefined'
-                # error
-                if self.have_elements("invalid-feedback"):
-                    raise
+            TYPE_USER = 'undefined'
+            # error
+            if self.have_elements("invalid-feedback"):
+                raise
 
-                # already
-                try:
-                    if len(wd.find_elements(By.NAME, 'clientPhoneNumber')) == 1:
-                        # clientPhoneNumber
-                        TYPE_USER = 'already'
-                except:
-                    pass
-
-                # button
-                try:
-                    if 'ללקוח זה נמצאה הזמנה פעילה, האם ברצונך להמשיך?' in wd.find_element(By.TAG_NAME, 
-                            'client-eligibility').text:
-                        TYPE_USER = 'button'
-                except:
-                    pass
-
-                # new
-                try:
-                    if len(wd.find_elements(By.NAME, 'clientId')) != 1:
-                        TYPE_USER = 'new'
-                except:
-                    pass
-                TYPE_USER = '123'
-                if TYPE_USER == 'already':
-                    wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
-                    wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
-                    dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
-                    dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
-                if TYPE_USER == 'button':
-                    dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
-                    dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
-                    wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
-                    wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
-                    dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
-                    dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
+            # already
+            try:
+                if len(wd.find_elements(By.NAME, 'clientPhoneNumber')) == 1:
+                    # clientPhoneNumber
                     TYPE_USER = 'already'
-                return TYPE_USER
+            except:
+                pass
+
+            # button
+            try:
+                if 'ללקוח זה נמצאה הזמנה פעילה, האם ברצונך להמשיך?' in wd.find_element(By.TAG_NAME,
+                                                                                       'client-eligibility').text:
+                    TYPE_USER = 'button'
+            except:
+                pass
+
+            # new
+            try:
+                if len(wd.find_elements(By.NAME, 'clientId')) != 1:
+                    TYPE_USER = 'new'
+            except:
+                pass
+            TYPE_USER = '123'
+            if TYPE_USER == 'already':
+                wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
+                wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
+                dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
+                dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
+            if TYPE_USER == 'button':
+                dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
+                dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
+                wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
+                wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
+                dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
+                dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
+                TYPE_USER = 'already'
+            return TYPE_USER
 
         # ===========OPTIONS PAGE
 
         # 1first_table,2second options
         def marking_options():
-            options = ts(2, lambda: wd.find_elements(By.CLASS_NAME, 'desing-radios'))
+            options = wd.find_elements(By.CLASS_NAME, 'desing-radios', count = 2)
             for u in options:
                 if u.find_element(By.XPATH, '..').text in ND_OPTION:
                     u.click()
-                    ts(0.01, can_skip = True)
+                    wd.noting(0.01, important = True)
 
         # 3third_table number
         def enter_number():
-            table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'portability-comp'))
+            table = wd.find_element(By.TAG_NAME, 'portability-comp', count = 0.5)
             labels = table.find_elements(By.TAG_NAME, 'label')
             if TYPE_USER == 'new' and NUMBER != 'חדש':
                 try:
                     labels[1].click()
                     table.find_element(By.NAME, 'phone').send_keys(NUMBER)
                     table.find_element(By.TAG_NAME, 'button').click()
-                    table = wd.find_element(By.TAG_NAME, 'portability-comp')
-                    table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'portability-comp'))
+                    table = wd.find_element(By.TAG_NAME, 'portability-comp', count = 2)
                     table.find_elements(By.NAME, 'verifyNeeded')[1].find_element(By.XPATH, '..').click()
-                    ts(2, can_skip = True)
                 except:
                     pass
                 # enter users data
-                table.find_element(By.NAME, 'firstName').send_keys(NUMBER)
+                table.find_element(By.NAME, 'firstName', count = 2).send_keys(NUMBER)
                 table.find_element(By.NAME, 'lastName').send_keys(line.SURNAME)
                 table.find_element(By.NAME, 'userId').send_keys(line.PASSPORT)
                 table.find_element(By.NAME, 'lastCompany').find_elements(By.TAG_NAME, 'option')[0].click()
@@ -338,7 +328,7 @@ class Worker(Log):
 
         # 5fifth_table tab enter
         def mark_last_params():
-            table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'regulations-comp'))
+            table = wd.find_element(By.TAG_NAME, 'regulations-comp', count = 0.5)
             rows = table.find_elements(By.CLASS_NAME, "form-group")[1:]
             for ci in range(len(rows)):
                 if ci == 0:
@@ -349,36 +339,39 @@ class Worker(Log):
                     id = 1
 
                 rows[ci].find_elements(By.TAG_NAME, 'label')[id].click()
-                ts(0.01, can_skip = True)
+                wd.noting(count = 0.01, important = True)
 
         # ACTION
         def end_action():
-            table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'purchase-summary'))
+            table = wd.find_element(By.TAG_NAME, 'purchase-summary', count = 0.5)
 
             if i + 1 == line.COUNT_LINES:
                 table.find_element(By.CLASS_NAME, 'continue').click()
             else:
                 buttons = table.find_elements(By.TAG_NAME, 'button')
-                if PLAN_TYPE == line.PLANS[i + 1].values():
+                if PLAN_TYPE == line.PLANS[i + 1]['plan_type']:
                     need_button = 'שכפל מנוי'
                 else:
                     need_button = 'הוסף מנוי נוסף'
                 for b in buttons:
                     if b.text == need_button:
                         b.click()
-                        ts(0.3, can_skip = True)
+                        wd.noting(count = 0.3, important = True)
+
                 # CHECK ON COPY MOVE
-                if PLAN_TYPE == line.PLANS[i + 1].values():
+                if PLAN_TYPE == line.PLANS[i + 1]['plan_type']:
                     option = 'דמי חיבור SIM ללא עלות'
                     options = wd.find_elements(By.CLASS_NAME, 'desing-radios')
                     for u in options:
-                        if u.find_element(By.XPATH, '..').text in option:
+                        if option in u.find_element(By.XPATH, '..').text:
                             u.click()
-                            ts(0.01, can_skip = True)
+                            wd.noting(count = 0.01, important = True)
+                    return "COPY"
+                return "UNCOPY"
 
         # AFTER PACKETS
         def enter_email():
-            table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'interactive-forms'))
+            table = wd.find_element(By.TAG_NAME, 'interactive-forms', count = 2)
             lbs = table.find_elements(By.TAG_NAME, 'label')
             for uu in lbs:
                 if 'ללא שליחת טפסים מקדימים' in uu.text:
@@ -388,7 +381,7 @@ class Worker(Log):
 
         # MAILING DATA
         def enter_mailing_data():
-            table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
+            table = wd.find_element(By.TAG_NAME, 'app-personaldetails', count = 2)
             if table.find_element(By.NAME, 'Phone').get_attribute('value') == '':
                 table.find_element(By.NAME, 'Phone').send_keys(line.NUMBER_USER)
 
@@ -407,7 +400,7 @@ class Worker(Log):
 
         # CITY, ADDRESS
         def enter_address():
-            table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
+            table = wd.find_element(By.TAG_NAME, 'app-personaldetails', count = 0.5)
             for ii in range(2):
                 if ii == 0:
                     tag = 'City'
@@ -416,15 +409,15 @@ class Worker(Log):
                     tag = 'Street'
                     parametr = line.STREET
 
-                # todo
-                if table.find_elements(By.NAME, tag)[1].get_attribute('value') != '': continue
+                # # todo
+                # if table.find_elements(By.NAME, tag)[1].get_attribute('value') != '': continue
 
                 inputs = table.find_elements(By.NAME, tag)
                 options_home, input = inputs[0], inputs[1]
 
                 for i in range(len(parametr)):
                     input.send_keys(parametr[i])
-                    ts(0.5, can_skip = False)
+                    wd.noting(count = 0.5, important = True)
 
                     options = options_home.find_elements(By.TAG_NAME, 'li')
                     if len(options) > 0:
@@ -437,11 +430,11 @@ class Worker(Log):
                         elif i + 1 == len(parametr):
                             options[0].click()
                             break
-                    ts(1, can_skip = False)
+                    wd.noting(count = 1, true = False)
 
         # PERS DATA
         def enter_more_data():
-            table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
+            table = wd.find_element(By.TAG_NAME, 'app-personaldetails', count = 0.5)
             if table.find_element(By.NAME, 'HouseNumber').get_attribute('value') == '':
                 table.find_element(By.NAME, 'HouseNumber').send_keys(line.HOUSE_NUMBER)
 
@@ -454,7 +447,7 @@ class Worker(Log):
 
         # DROP CITY,ADDR
         def enter_more_data2():
-            table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'retail-deliverytype'))
+            table = wd.find_element(By.TAG_NAME, 'retail-deliverytype', count = 2)
             for ii in range(2):
                 if ii == 0:
                     tag = 'City'
@@ -468,12 +461,12 @@ class Worker(Log):
                 inputs = table.find_elements(By.NAME, tag)
                 options_home, input = inputs[0], inputs[1]
 
-                # todo
-                if input.get_attribute('value') != '': continue
+                # # todo
+                # if input.get_attribute('value') != '': continue
 
                 for i in range(len(parameter)):
                     input.send_keys(parameter[i])
-                    ts(1.5, can_skip = False)
+                    wd.noting(count = 1.5, important = True)
 
                     # try:
                     options = options_home.find_elements(By.TAG_NAME, 'li')
@@ -488,16 +481,16 @@ class Worker(Log):
                             options[0].click()
                             break
                     # except:pass
-                ts(1.5, can_skip = False)
+                wd.noting(count = 1.5, important = False)
             element = table.find_element(By.NAME, 'houseNumber')
             if element.get_attribute('value') == '': element.send_keys(line.HOUSE_NUMBER)
             element = table.find_element(By.NAME, 'apartmentNumber')
             if element.get_attribute('value') == '': element.send_keys(line.APART_NUMBER)
-            ts(2, lambda: wd.find_element(By.CLASS_NAME, 'continue')).click()
+            wd.find_element(By.CLASS_NAME, 'continue', count = 2).click()
 
         # CARD
         def enter_card():
-            table = ts(1, lambda: wd.find_element(By.TAG_NAME, 'payemnt-comp'))
+            table = wd.find_element(By.TAG_NAME, 'payemnt-comp', count = 1)
             if TYPE_USER == 'already':
                 table = wd.find_element(By.TAG_NAME, 'payemnt-comp')
                 table.find_element(By.TAG_NAME, 'label').click()
@@ -517,8 +510,8 @@ class Worker(Log):
 
         # SAVE
         def save():
-            ts(1, lambda: wd.find_element(By.CLASS_NAME, 'continue')).click()
-            boxes = ts(1, lambda: wd.find_elements(By.CLASS_NAME, 'box'))
+            wd.find_element(By.CLASS_NAME, 'continue', count = 1).click()
+            boxes = wd.find_elements(By.CLASS_NAME, 'box', count = 1)
 
             if len(boxes) == 1:
                 box = boxes[0]
@@ -528,17 +521,16 @@ class Worker(Log):
                 # labels[lab_index].config(text = last_er)
 
             else:
-                kod1 = self.web_driver.find_element(By.XPATH, 
-                    '/html/body/app-root/master-page/div/div[2]/div[1]/app-purchase/form/div/thank-you/div/div/div[2]/div[3]/div[1]').text
-                kod2 = self.web_driver.find_element(By.XPATH, 
-                    '/html/body/app-root/master-page/div/div[2]/div[1]/app-purchase/form/div/thank-you/div/div/div[2]/div[1]/div/div[3]').text
+                kod1 = self.web_driver.find_element(By.XPATH,
+                                                    '/html/body/app-root/master-page/div/div[2]/div[1]/app-purchase/form/div/thank-you/div/div/div[2]/div[3]/div[1]').text
+                kod2 = self.web_driver.find_element(By.XPATH,
+                                                    '/html/body/app-root/master-page/div/div[2]/div[1]/app-purchase/form/div/thank-you/div/div/div[2]/div[1]/div/div[3]').text
 
                 self.MainSheet.set_value('AM', line.index, kod1 + ' ' + kod2)
                 # labels[indexxx].config(text = kod1 + ' ' + kod2)
 
         # ========== SCENARIO ==========
         if open_link(): return
-        TYPE_USER = 'undefined'
 
         WriteLines = [
             choose_plans,
@@ -549,6 +541,7 @@ class Worker(Log):
             mark_last_params,
             end_action
         ]
+
         PersonalData = [
             enter_email,
             enter_mailing_data,

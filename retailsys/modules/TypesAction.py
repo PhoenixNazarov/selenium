@@ -2,7 +2,7 @@ from tkinter import *
 
 from config import *
 from modules.LinesGroup import LinesGroup
-from modules.Data import Log
+from modules.data.Log import Log
 
 
 class Error(Log):

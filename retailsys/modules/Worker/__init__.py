@@ -6,7 +6,7 @@ import threading
 from config import *
 from modules.exception.Handlers import *
 from modules.Line import Line
-from modules.Data import SettingsJson, Log, ErrorsSheetBase, ErrorsSheetCollect
+from modules.data import SettingsJson, Log, ErrorsSheetBase, ErrorsSheetCollect
 
 from modules.Worker.MyWebDriver import WebDriver
 from modules.Objects import WebDriverLogics

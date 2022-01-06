@@ -22,7 +22,8 @@ SORTED_KEYS = [['צוות נוטשים', 'נוטשים'], ['צוות נוטשי�
 
 TIME_DELAY_PERC = float(out['TIME_DELAY_PERC'])
 MAX_TIME_WAIT = float(out['MAX_TIME_WAIT'])
-TYPE_SLEEP = out['TYPE_SLEEP']  # last
+TYPE_SLEEP = out['TYPE_SLEEP']  # standard
+CAN_MISS_WHEN_SLEEP = 2
 
 LOGGING = out['LOGGING']
 
