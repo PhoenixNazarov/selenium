@@ -4,12 +4,13 @@ import selenium
 import threading
 
 from config import *
-from modules.Exceptions import SmsLoadError
+from modules.exception.Handlers import *
 from modules.Line import Line
-from modules.Data import SettingsJson, Log
+from modules.Data import SettingsJson, Log, ErrorsSheetBase, ErrorsSheetCollect
 
 
-def get_mes(password):
+@mail_exception
+def get_mes(password, numb):
     import imaplib
     mail = imaplib.IMAP4_SSL('imap.gmail.com')
 
@@ -56,57 +57,88 @@ class Worker(Log):
         self.numb = numb
         self.Settings = SettingsJson(numb)
         self.MainSheet = MainSheet
+        self.ErrorSheet = ErrorsSheetBase()
+        self.ErrorSheetCollect = ErrorsSheetCollect()
 
         self.type_sleep = TYPE_SLEEP
+        self.current_line = None
 
     def start(self):
         self.Status.set_status('start')
 
         password = self.Settings.get_data()
-
-        try:
-            SMS_LAST = get_mes(password)
-        except Exception as e:
-            raise SmsLoadError(password['mail'], self.numb)
-
         options = webdriver.ChromeOptions()
-        self.web_driver = webdriver.Chrome(chrome_options = options, executable_path = "webDriver/chromedriver.exe")
+        self.web_driver = webdriver.Chrome(chrome_options = options, executable_path = PATH_WEBDRIVER)
 
         name = str(self.numb)
         self.web_driver.execute_script("window.open('http://" + name + ".com', '_blank');")
-        self.time_sleep(1)
         self.web_driver.switch_to.window(self.web_driver.window_handles[0])
         self.web_driver.get('https://retailsys.hotnet.net.il/Login')
-        self.time_sleep(2)
+        time.sleep(2 * TIME_DELAY_PERC)
 
         if password['auto_login'] == 0:
             return
 
         # LOGGING
-        SMS_LAST = get_mes(password)
+        SMS_LAST = get_mes(password, self.numb)
         self.web_driver.find_elements(By.TAG_NAME, 'input')[0].send_keys(password['user_name'])
         self.web_driver.find_elements(By.TAG_NAME, 'input')[1].click()
-        self.time_sleep(2)
+        time.sleep(2)
 
-        #
         self.Status.set_status('enter_sms')
         while 1:
-            SMS = get_mes(password)
+            SMS = get_mes(password, self.numb)
             if SMS != SMS_LAST: break
-            self.time_sleep(1)
+            time.sleep(1)
         self.web_driver.find_elements(By.TAG_NAME, 'input')[0].send_keys(SMS)
         self.web_driver.find_elements(By.TAG_NAME, 'input')[1].click()
 
-    def polling(self):
-        def thread():
-            self.start()
+    @worker_exceptions
+    def thread(self):
+        self.start()
 
-            while 1:
-                line = self.Stack.wait_line()
-                self.plan(line)
-                self.Stack.end_line(line)
+        while 1:
+            self.current_line = None
+            line = self.Stack.wait_line()
+            self.current_line = line
+            self.plan(line)
+            self.Stack.end_line(line)
 
-        threading.Thread(target = thread).start()
+    def error_solver(self, error):
+        wd = self.web_driver
+        line = self.current_line
+        match error['name']:
+            case "brute_numbers":
+                for val in line.PLANS[1:]:
+                    dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
+                    dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
+                    wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(val['number'])
+                    wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
+                    dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
+                    dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
+                    success = self.have_elements("invalid-feedback", call_solver = False)
+                    if success:
+                        return False
+                return True
+
+            case "log_out":
+                self.ErrorSheetCollect.write_error(error)
+                return True
+
+    def have_elements(self, _type, call_solver=True):
+        match _type:
+            case "invalid-feedback":
+                try:
+                    errors = [i.text for i in self.web_driver.find_elements(By.CLASS_NAME, "invalid-feedback")]
+                    if errors != '':
+                        self.write_log("invalid-feedback", ' | '.join(errors), self.numb)
+                        if call_solver:
+                            return self.error_solver(self.ErrorSheet.get_error_description(errors[0]))
+                    else:
+                        return False
+                except:
+                    pass
+                return False
 
     def error_checker(self, function):
         error_api = self.Error
@@ -121,6 +153,10 @@ class Worker(Log):
                         return False
                     return ret
                 except Exception as e:
+                    errors = self.have_elements("invalid-feedback")
+                    if errors:
+                        return True
+
                     self.write_log('line_error', e, self.numb)
                     error_api.change_position(e, 1)
                     command = error_api.wait_change_position()
@@ -138,29 +174,29 @@ class Worker(Log):
 
     def time_sleep(self, count, element_finder=None, can_skip=False):
         time_start = time.time()
-        if element_finder is None:
-            if not can_skip:
+        match self.type_sleep, count, element_finder, can_skip:
+            case "last", count, element_finder, can_skip:
                 time.sleep(count * TIME_DELAY_PERC)
-
-        if self.type_sleep == 'last':
-            time.sleep(count * TIME_DELAY_PERC)
-        elif self.type_sleep == 'fast':
-            start = time.time()
-            while 1:
-                if time.time() - start > MAX_TIME_WAIT:
-                    self.write_log('line_delay_max_time', json.dumps({
-                        "time_delta": round(time.time() - time_start, 5),
-                        "line_status": self.Status.get_status(),
-                        "TYPE_SLEEP": self.type_sleep,
-                        "can_skip": can_skip,
-                        "count": count,
-                        "element_finder": 0 if element_finder is None else 1
-                    }), self.numb)
-                    raise Exception
-                try:
-                    return element_finder()
-                except selenium:
-                    pass
+            case "fast", count, None, can_skip:
+                if not can_skip:
+                    time.sleep(count * TIME_DELAY_PERC)
+            case "fast", count, element_finder, can_skip:
+                start = time.time()
+                while 1:
+                    if time.time() - start > MAX_TIME_WAIT:
+                        self.write_log('line_delay_max_time', json.dumps({
+                            "time_delta": round(time.time() - time_start, 5),
+                            "line_status": self.Status.get_status(),
+                            "TYPE_SLEEP": self.type_sleep,
+                            "can_skip": can_skip,
+                            "count": count,
+                            "element_finder": 0 if element_finder is None else 1
+                        }), self.numb)
+                        raise FinderTooTime(self.numb, MAX_TIME_WAIT)
+                    try:
+                        return element_finder()
+                    except:
+                        pass
 
         self.write_log('line_delay', json.dumps({
             "time_delta": round(time.time() - time_start, 5),
@@ -171,6 +207,7 @@ class Worker(Log):
             "element_finder": 0 if element_finder is None else 1
         }), self.numb)
 
+    @elements_exception
     def plan(self, line: Line):
         wd = self.web_driver
         ts = self.time_sleep
@@ -211,11 +248,8 @@ class Worker(Log):
 
                 type_user = 'undefined'
                 # error
-                try:
-                    if wd.find_element(By.CLASS_NAME, 'invalid-feedback').text != '':
-                        type_user = 'error'
-                except:
-                    pass
+                if self.have_elements("invalid-feedback"):
+                    raise
 
                 # already
                 try:
@@ -240,7 +274,6 @@ class Worker(Log):
                 except:
                     pass
 
-                if type_user == 'error': raise
                 if type_user == 'already':
                     wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
                     wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
@@ -365,9 +398,9 @@ class Worker(Log):
             table.find_element(By.NAME, 'FirstName').send_keys(line.NAME)
             table.find_element(By.NAME, 'LastName').send_keys(line.SURNAME)
 
-        # CITY,ADDR
+        # CITY, ADDRESS
         @self.error_checker
-        def enter_addr():
+        def enter_address():
             table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
             for ii in range(2):
                 if ii == 0:
@@ -501,12 +534,11 @@ class Worker(Log):
                 self.MainSheet.set_value('AM', line.index, kod1 + ' ' + kod2)
                 # labels[indexxx].config(text = kod1 + ' ' + kod2)
 
-        # PLAN
-        if open_link():
-            return
+        # ========== SCENARIO ==========
+        if open_link(): return
 
         TYPE_USER = 'undefined'
-        for i in range(len(line.COUNT_LINES)):
+        for i in range(line.COUNT_LINES):
             PLAN_NAME, NAME_CARD, PLAN_TYPE, ND_OPTION, NUMBER = line.PLANS[i].values()
 
             if choose_plans(): return
@@ -522,7 +554,7 @@ class Worker(Log):
 
         if enter_email(): return
         if enter_mailing_data(): return
-        if enter_addr(): return
+        if enter_address(): return
         if enter_more_data(): return
         if enter_more_data2(): return
         if enter_card(): return
@@ -533,3 +565,6 @@ class Worker(Log):
         command = self.Save.wait_command()
         if command:
             save()
+
+    def polling(self):
+        threading.Thread(target = self.thread).start()

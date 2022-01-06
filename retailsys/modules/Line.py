@@ -60,7 +60,7 @@ class Line:
         for i in range(self.COUNT_LINES):
             for row in plans:
                 if self.PLANS[i]['name'] == row[0]:
-                    self.PLANS[i]['plan_type'] = row[2]
+                    self.PLANS[i]['plan_type'] = int(row[2])
                     # if self.numb in [0, 3]:
                     #     self.PLANS[i]['plan_type'] = row[2]
                     # else:

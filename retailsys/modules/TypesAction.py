@@ -1,4 +1,3 @@
-from functools import partial
 from tkinter import *
 
 from config import *
@@ -139,10 +138,10 @@ class Stack:
     def wait_line(self):
         while len(self.__stack) == 0:
             pass
-        line = self.__stack.pop(0)
-        self.__run_index = line.index
+        line_index = self.__stack.pop(0)
+        self.__run_index = line_index
         self.__reload_lines_ui()
-        return line
+        return self.__linesGroup.get_line_from(line_index)
 
     def end_line(self, line):
         self.__end_indexes.append(line.index)
@@ -150,11 +149,11 @@ class Stack:
 
     def get_status(self, line_index):
         if line_index == self.__run_index:
-            return 'run'
+            return ['run']
         elif line_index in self.__stack:
-            return 'in_stack', str(self.__stack.index(line_index) + 1)
+            return ['in_stack', str(self.__stack.index(line_index) + 1)]
         else:
-            return 'wait'
+            return ['wait']
 
     def __add_line_in_ui(self, line=None, line_index=None):
         if line_index is not None:

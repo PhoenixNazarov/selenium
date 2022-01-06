@@ -7,9 +7,12 @@ with open(r'.settings', 'r') as file:
 COUNT_GROUPS = 4
 
 # SHEETS DIRS
-DIR_MAIN_SHEET = out['DIR_MAIN_SHEET']
-DIR_SORT_SHEET = out['DIR_SORT_SHEET']
-DIR_PLANS_SHEET = out['DIR_PLANS_SHEET']
+PATH_MAIN_SHEET = out['PATH_MAIN_SHEET']
+PATH_SORT_SHEET = out['PATH_SORT_SHEET']
+PATH_PLANS_SHEET = out['PATH_PLANS_SHEET']
+PATH_ERRORS_SHEET = 'data/errors.xlsx'
+PATH_COLLECT_ERRORS_SHEET = 'data/collect_errors.xlsx'
+PATH_WEBDRIVER = out['PATH_WEBDRIVER']
 SETTINGS_ACCOUNT_PATH = out['SETTINGS_ACCOUNT_PATH']
 LOG_PATH = out['LOG_PATH']
 
@@ -17,8 +20,8 @@ SHEET_PLANS_COLUMN = ['A', 'B', 'C', 'D', 'E']
 SHEET_SORT_COLUMN = [['A', 'B'], ['C', 'D'], ['E', 'F'], ['G', 'H']]
 SORTED_KEYS = [['צוות נוטשים', 'נוטשים'], ['צוות נוטשים', 'WB'], ['צוות WB', 'WB'], ['צוות WB', 'נוטשים']]
 
-TIME_DELAY_PERC = out['TIME_DELAY_PERC']
-MAX_TIME_WAIT = out['MAX_TIME_WAIT']
+TIME_DELAY_PERC = float(out['TIME_DELAY_PERC'])
+MAX_TIME_WAIT = float(out['MAX_TIME_WAIT'])
 TYPE_SLEEP = out['TYPE_SLEEP']  # last
 
 LOGGING = out['LOGGING']

@@ -1,15 +1,14 @@
+from modules.exception.Handlers import main_exceptions
 from config import *
-from modules.Data import MainSheet, FilterSheet, PlansSheet
-from modules.UI import UI
+from modules.data.Sheets import MainSheet, FilterSheet, PlansSheet
+from modules.UI.Window import UI
 from modules.LinesGroup import LinesGroup
 from modules.Worker import Worker
-from modules.Exceptions import main_exceptions, test_path
 
 
 @main_exceptions
 class Control:
     def __init__(self):
-        test_path()
         self.Sheets = {
             'Main': MainSheet(),
             'Filter': FilterSheet(),
@@ -31,7 +30,8 @@ class Control:
         for numb in range(COUNT_GROUPS):
             canvas[numb].Stack.load_lines(line_groups[numb])
             worker = Worker(*canvas[numb].get_worker_config(), self.Sheets['Main'])
-            worker.polling()
+            if len(line_groups[numb].get_lines()) > 0:
+                worker.polling()
 
         self.UI.show_UI()
 
