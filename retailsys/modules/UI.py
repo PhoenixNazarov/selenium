@@ -1,4 +1,5 @@
 from tkinter import messagebox
+from awesometkinter.bidirender import add_bidi_support
 from tkinter import *
 
 from config import *
@@ -189,131 +190,150 @@ class CanvasWorkerSettings:
         btn_settings.place(x = 120, y = 100, width = 60, height = 20)
 
 
-class CanvasLineSettings:
+class CanvasLineSettings(Tk):
     def __init__(self, line):
-        self.line = line
-        self.root1 = None
-        self.message1 = None
-        self.message2 = None
-        self.other_messages = [[]] * 3
+        name = f'change_line_{line.index}'
+        super().__init__(screenName = name, className = name)
+        self.resizable(width = False, height = False)
 
-        self.open_window()
+        message2 = StringVar(self)
 
-    def save(self):
-        self.root1.destroy()
-        brt = self.line.count_lines
-        for i in range(brt):
-            self.MainSheet.set_value("E", self.line.index + i, self.message1.get())
-            self.MainSheet.set_value("Z", self.line.index + i, self.message2.get())
-            self.MainSheet.set_value("G", self.line.index + i, self.other_messages[0][i].get())
-            self.MainSheet.set_value("V", self.line.index + i, self.other_messages[1][i].get())
-            self.MainSheet.set_value("AU", self.line.index + i, self.other_messages[2][i].get())
-        self.MainSheet.save()
+        canvas = Canvas(self, background = "grey90", width = 500, height = 60 + 40 * line.COUNT_LINES)
+        canvas.pack(side = "bottom", fill = "both", expand = True)
 
-    def open_window(self):
-        self.root1 = Tk()
-        self.root1.resizable(width = False, height = False)
-
-        canvas2 = Canvas(self.root1, background = "grey90", width = 500, height = 60 + 40 * self.line.COUNT_LINES)
-        canvas2.pack(side = "bottom", fill = "both", expand = True)
-
-        self.message1 = StringVar(self.root1)
-        self.message2 = StringVar(self.root1)
-
-        message_entry1 = Entry(canvas2, textvariable = self.message1)
+        # NAME
+        message1 = StringVar(self)
+        message_entry1 = Entry(canvas, textvariable = message1)
+        add_bidi_support(message_entry1)
         message_entry1.place(x = 5, y = 5, width = 100)
-        message_entry1.insert(0, self.line.NAME)
-        message_entry2 = Entry(canvas2, textvariable = self.message2)
-        message_entry2.place(x = 110, y = 5, width = 100)
-        message_entry2.insert(0, self.line.SURNAME)
+        message_entry1.insert(0, line.NAME)
 
-        lis_v = []
-        counter = 1
-        while self.MainSheet.get_value('A', counter):
-            lis_v.append(self.MainSheet.get_value('A', counter))
-            counter += 1
+        # SURNAME
+        message2 = StringVar(self)
+        message_entry2 = Entry(canvas, textvariable = message2)
+        add_bidi_support(message_entry2)
+        message_entry2.place(x = 110, y = 5, width = 100)
+        message_entry2.insert(0, line.SURNAME)
 
         ii = 0
-        for ii in range(self.line.count_lines):
-            nums = str(self.line.NUMBERS[ii])
-            tar = str(self.line.tarifs[ii])
-            check_b = self.MainSheet.get_value('AU', self.line.index + ii)
-
-            mes = StringVar(self.root1)
-            message_entry = Entry(canvas2, textvariable = mes)
+        other_messages = [[], []]
+        for ii in range(line.COUNT_LINES):
+            mes = StringVar(self)
+            message_entry = Entry(canvas, textvariable = mes)
+            add_bidi_support(message_entry)
             message_entry.place(x = 5, y = 30 + 40 * ii, width = 205)
-            message_entry.insert(0, nums)
+            message_entry.insert(0, line.PLANS[ii]['number'])
 
-            var = StringVar(self.root1)
-            var.set(tar)
-            opt = OptionMenu(canvas2, var, *lis_v)
+            var = StringVar(self)
+            var.set(line.PLANS[ii]['name'])
+            opt = OptionMenu(canvas, var, *[i[0] for i in line.plans])
             opt.place(x = 210, y = 30 + 40 * ii, width = 205)
 
-            rad_variable = IntVar(self.root1)
-            if check_b == 1:
-                rad_variable.set(1)
-            r1 = Checkbutton(canvas2, text = '1', variable = rad_variable, onvalue = '1', offvalue = '0')
-            r1.place(x = 420, y = 30 + 40 * ii, width = 30)
+            other_messages[0].append(mes)
+            other_messages[1].append(var)
 
-            self.other_messages[0].append(message_entry)
-            self.other_messages[1].append(var)
-            self.other_messages[2].append(rad_variable)
+        def save():
+            self.destroy()
+            line.change_data("NAME", message1.get())
+            line.change_data("SURNAME", message2.get())
+            line.change_data("PLANS_name", [i.get() for i in other_messages[0]])
+            line.change_data("PLANS_number", [i.get() for i in other_messages[1]])
 
-        message_button = Button(canvas2, text = "Save",
-                                command = lambda: self.save())
+        message_button = Button(canvas, text = "Save", command = save)
         message_button.place(x = 210, y = 30 + 40 * (ii + 1))
-        self.root1.mainloop()
+
+        self.mainloop()
 
 
 class CanvasUI:
+    class LineButtonUI(Frame):
+        def __init__(self, canvas, offset, separators, line, command=None, status=None):
+            self.separators = separators
+            self.offset = offset
+            Frame.__init__(self, canvas)
+            self.place(x = 0,
+                       y = (height_line + height_line_ots) * self.offset[0] + 85,
+                       width = width_block,
+                       height = height_line)
+            self.offset[0] += 1
+
+            if line is None:
+                self.__separator(command)
+                return
+
+            Label(self, text = str(line.index), background = "grey90").place(x = 0, y = 0, width = 20)
+
+            btn_settings = Button(self, text = str(line.COUNT_LINES), command = closure(CanvasLineSettings, line))
+            btn_settings.place(x = 20, y = 0, width = 20)
+
+            Label(self, text = line.NAME, background = "grey90").place(x = 40, y = 0, width = 40)
+            Label(self, text = line.SURNAME, background = "white").place(x = 80, y = 0, width = 50)
+            Label(self, text = line.PASSPORT, background = "grey90").place(x = 130, y = 0, width = 60)
+            Label(self, text = line.CITY, background = "white").place(x = 190, y = 0, width = 85)
+            Label(self, text = line.STREET, background = "grey90").place(x = 275, y = 0, width = 80)
+
+            self.__button = Button(self, text = '▶', fg = 'green', command = command)
+            self.__button.place(x = 355, y = 0, width = 20)
+
+            self.change_status(*status)
+
+        def __separator(self, text):
+            back_color = "grey90"
+            match text:
+                case "":
+                    self.configure(background = "white")
+                    return
+                case "run":
+                    fg = "#275c5b"
+                case "stack":
+                    fg = '#694510'
+                case "wait":
+                    fg = '#028200'
+                case _:
+                    fg = '#696969'
+
+            text = ' ' * 100 + text + ' ' * 100
+            result = ''
+            for c in text:
+                result += c
+                if c == ' ':
+                    result += '\u0336'
+
+            Label(self, text = result, background = back_color, justify = CENTER, fg = fg).place(x = 0, y = 0,
+                                                                                                 width = width_block)
+
+        def change_status(self, status, *args):
+            if status == 'run':
+                self.__button.configure(fg = 'red', text = '0')
+            elif status == 'in_stack':
+                self.__button.configure(fg = 'red', text = str(args[0]))
+            else:
+                self.__button.configure(fg = 'green', text = '▶')
+
+        def destroy(self):
+            while len(self.separators) != 0:
+                self.separators.pop(0).destroy()
+            self.offset[0] = 0
+            Frame.destroy(self)
+
     def __init__(self, canvas, numb):
         self.canvas = canvas
-        self.numb = numb
+        self.number_name = numb
 
         # link with Worker
         self.Error = self.__place_error()
         self.Save = self.__place_save()
         self.Status = self.__place_status()
         self.Settings = self.__place_settings()
-        self.destroy = []
+        self.Stack = Stack(self.place_line)
+        self.offset = [0]
+        self.separators = []
 
     def get_worker_config(self):
-        return self.Error, self.Save, self.Status, self.Status, self.numb
+        return self.Error, self.Save, self.Status, self.Stack, self.number_name
 
-    def place_line(self, line, count):
-        new_canv = Frame(self.canvas, background = "grey90")
-        new_canv.place(x = 0, y = (height_line + height_line_ots) * count + 85, width = width_block,
-                       height = height_line)
-        self.destroy.append(new_canv)
-
-        lab = Label(new_canv, text = str(count), background = "grey90")
-        lab.place(x = 0, y = 0, width = 20)
-
-        btn4 = Button(new_canv, text = str(line.COUNT_LINES))
-        btn4.place(x = 20, y = 0, width = 20)
-
-        lab = Label(new_canv, text = line.NAME, background = "grey90")
-        lab.place(x = 40, y = 0, width = 40)
-
-        lab = Label(new_canv, text = line.SURNAME, width = 1, background = "white")
-        lab.place(x = 80, y = 0, width = 50)
-
-        lab = Label(new_canv, text = line.PASSPORT, width = 1, background = "grey90")
-        lab.place(x = 130, y = 0, width = 60)
-
-        lab = Label(new_canv, text = line.CITY, width = 1, background = "white")
-        lab.place(x = 190, y = 0, width = 85)
-
-        lab = Label(new_canv, text = line.STREET, width = 1, background = "grey90")
-        lab.place(x = 275, y = 0, width = 80)
-
-        button_start = Button(new_canv, text = '▶', fg = 'green')
-        button_start.place(x = 355, y = 0, width = 20)
-        return button_start
-
-    def remove_lines(self):
-        for i in self.destroy:
-            i.destroy()
+    def place_line(self, line, *args, **kwargs):
+        return self.LineButtonUI(self.canvas, self.offset, self.separators, line, *args, **kwargs)
 
     def __place_error(self):
         label_status_error = Label(self.canvas, text = '🔴', background = "white", fg = 'white')
@@ -325,7 +345,7 @@ class CanvasUI:
         btn_error_repeat.place(x = 80, y = 25, width = 60)
         btn_error_cancel = Button(self.canvas, text = 'cancel❌', fg = 'red', background = "white", state = DISABLED)
         btn_error_cancel.place(x = 140, y = 25, width = 60)
-        return Error([label_status_error, btn_error_next, btn_error_repeat, btn_error_cancel], self.numb)
+        return Error([label_status_error, btn_error_next, btn_error_repeat, btn_error_cancel], self.number_name)
 
     def __place_save(self):
         label_status_end = Label(self.canvas, text = '🔴', background = "white", fg = 'white')
@@ -339,12 +359,12 @@ class CanvasUI:
     def __place_status(self):
         status_label = Label(self.canvas, text = 'start', background = "white")
         status_label.place(x = 0, y = 0, width = width_block)
-        return Status(status_label, self.numb)
+        return Status(status_label, self.number_name)
 
     def __place_settings(self):
         btn_settings = Button(self.canvas, text = '⚙', fg = 'grey', background = "white")
         btn_settings.place(x = 355, y = 25, width = 20, height = 20)
-        return CanvasWorkerSettings(btn_settings, self.numb)
+        return CanvasWorkerSettings(btn_settings, self.number_name)
 
 
 class UI(Tk):

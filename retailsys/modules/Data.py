@@ -24,8 +24,7 @@ class Sheet:
     def __init__(self, path):
         self.path = path
         self._wb = load_workbook(path)
-        for g in self._wb:
-            self.sheet = self._wb[str(g)[12:-2]]
+        self.sheet = self._wb.active
 
     def get_columns(self, columns, offset=0):
         data = []
@@ -48,7 +47,17 @@ class Sheet:
         return self.sheet[f'{column}{line}'].value
 
     def set_value(self, column, line, val):
+        print(column, line, val)
         self.sheet[f'{column}{line}'].value = val
+
+    def save(self):
+        self._wb.save(self.path)
+
+    def __getitem__(self, item):
+        return self.get_value(item, '')
+
+    def __setitem__(self, key, value):
+        return self.set_value(self, key, "", value)
 
 
 class MainSheet(Sheet):
@@ -86,11 +95,11 @@ class MainSheet(Sheet):
     def load_config_lines(self):
         line_index = 2
         config_lines = []
-        while self.get_special_data("count_line", line_index):
-            count_lines = int(self.get_special_data("count_line", line_index))
+        while self.get_value(LINE_MATCHER["COUNT_LINES"], line_index):
+            count_lines = int(self.get_value(LINE_MATCHER["COUNT_LINES"], line_index))
             config_lines.append([
-                [self.get_special_data("first_sort_key", line_index),
-                 self.get_special_data("second_sort_key", line_index)],
+                [self.get_value(LINE_MATCHER["first_sort_key"], line_index),
+                 self.get_value(LINE_MATCHER["second_sort_key"], line_index)],
                 count_lines]
             )
             line_index += count_lines

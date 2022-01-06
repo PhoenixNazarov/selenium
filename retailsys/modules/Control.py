@@ -1,6 +1,5 @@
 from config import *
 from modules.Data import MainSheet, FilterSheet, PlansSheet
-from modules.TypesAction import Stack
 from modules.UI import UI
 from modules.LinesGroup import LinesGroup
 from modules.Worker import Worker
@@ -30,9 +29,9 @@ class Control:
         # place on UI
         canvas = self.UI.make_root()
         for numb in range(COUNT_GROUPS):
-            stack = Stack(line_groups[numb].lines, canvas[numb])
-            stack.place_lines()
-            # line_groups[numb].place_on_UI(canvas[numb])
+            canvas[numb].Stack.load_lines(line_groups[numb])
             worker = Worker(*canvas[numb].get_worker_config(), self.Sheets['Main'])
+            worker.polling()
 
         self.UI.show_UI()
+

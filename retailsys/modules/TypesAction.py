@@ -1,6 +1,8 @@
+from functools import partial
 from tkinter import *
 
 from config import *
+from modules.LinesGroup import LinesGroup
 from modules.Data import Log
 
 
@@ -113,64 +115,78 @@ class Status(Log):
 
 
 class Stack:
-    __base = []
-    __stack = []
-    __run_index = -1
-    __end_indexes = []
+    # contains all __lines for Worker
+    def __init__(self, place_line):
+        self.__place_line = place_line
+        self.__linesGroup: LinesGroup = None
+        self.__linesUI = {}
 
-    def __init__(self, lines, UI):
-        number = 1
-        for line in lines:
-            self.__base.append({
-                'line': line,
-                'status': 'wait',  # run end
-                'number': number,
-                'button': None
-            })
-            number += 1
-        self.__UI = UI
+        self.__stack = []
+        self.__run_index = -1
+        self.__end_indexes = []
 
-    def wait_line(self):
-        while len(self.__stack) == 0:
-            pass
-        line = self.__stack.pop(0)
-        self.__run_index = line.index
-        self.reload_buttons()
-        return line
-
-    def end_line(self, line):
-        self.__end_indexes.append(line.index)
-        self.reload_buttons()
+    def load_lines(self, group: LinesGroup):
+        self.__linesGroup = group
+        self.__reload_lines_ui()
 
     def force_line(self, line_index):
         if line_index in self.__stack:
             self.__stack.pop(self.__stack.index(line_index))
         else:
             self.__stack.append(line_index)
-        self.reload_buttons()
+        self.__reload_lines_ui()
 
-    def reload_buttons(self):
-        for val in self.__base:
-            if val['button'] is None: continue
+    def wait_line(self):
+        while len(self.__stack) == 0:
+            pass
+        line = self.__stack.pop(0)
+        self.__run_index = line.index
+        self.__reload_lines_ui()
+        return line
 
-            if val['line'].index == self.__run_index:
-                color, text = 'red', '0'
-            elif val['line'].index in self.__stack:
-                color, text = 'red', str(self.__stack.index(val['line'].index) + 1)
-            else:
-                color, text = 'green', '▶'
+    def end_line(self, line):
+        self.__end_indexes.append(line.index)
+        self.__reload_lines_ui()
 
-            val['button'].configure(fg = color, text = text)
+    def get_status(self, line_index):
+        if line_index == self.__run_index:
+            return 'run'
+        elif line_index in self.__stack:
+            return 'in_stack', str(self.__stack.index(line_index) + 1)
+        else:
+            return 'wait'
 
-    def place_lines(self):
-        for line in self.__base:
-            button = self.__UI.place_line(line['line'], line['number'])
-            line['button'] = button
-            button['comand'] = self.force_line(line['line'].index)
+    def __add_line_in_ui(self, line=None, line_index=None):
+        if line_index is not None:
+            line = self.__linesGroup.get_line_from(line_index)
+        status = self.get_status(line.index)
+        self.__linesUI.update({line.index: self.__place_line(line, closure(self.force_line, line.index), status)})
 
-    def add_line(self, line, button):
-        self.__base.append({
-            'line': line,
-            'button': button
-        })
-        button['comand'] = self.force_line(line.index)
+    def __reload_lines_ui(self):
+        for i in self.__linesUI.values():
+            i.destroy()
+
+        self.__linesUI = {}
+        # active
+        if self.__run_index != -1:
+            self.__place_line(None, "run")
+            self.__add_line_in_ui(line_index = self.__run_index)
+            self.__place_line(None, '')
+
+        # in_stack
+        self.__place_line(None, "stack")
+        [self.__add_line_in_ui(line_index = index) for index in self.__stack]
+        self.__place_line(None, '')
+
+        # wait
+        self.__place_line(None, "wait")
+        for line in self.__linesGroup.get_lines():
+            if line.index != self.__run_index and \
+                    line.index not in self.__stack and \
+                    line.index not in self.__end_indexes:
+                self.__add_line_in_ui(line = line)
+        self.__place_line(None, "")
+
+        # end
+        self.__place_line(None, "end")
+        [self.__add_line_in_ui(line_index = index) for index in self.__end_indexes]

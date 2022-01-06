@@ -19,6 +19,32 @@ SORTED_KEYS = [['צוות נוטשים', 'נוטשים'], ['צוות נוטשי�
 
 TIME_DELAY_PERC = out['TIME_DELAY_PERC']
 MAX_TIME_WAIT = out['MAX_TIME_WAIT']
-TYPE_SLEEP = out['TYPE_SLEEP'] # last
+TYPE_SLEEP = out['TYPE_SLEEP']  # last
 
 LOGGING = out['LOGGING']
+
+LINE_MATCHER = {
+    "COUNT_LINES": "S",
+    "PLANS_name": "V",
+    "PLANS_number" : "G",
+    "PASSPORT": "D",
+    "NAME": "E",
+    "SURNAME": "Z",
+    "CITY": "AA",
+    "STREET_APART_NUMBER_HOUSE_NUMBER": "AB",
+    "NUMBER_USER": "AC",
+    "POBox": "000",
+    "TYPE_PAY": "AF",  # ["card", "bank"] # 'הוראת קבע'
+    "CARD": "AO",
+    "SROK": "AP",
+    "unique_symbol": "BD",
+    "first_sort_key": "P",
+    "second_sort_key": "M"
+}
+
+
+def closure(command, *args, **kwargs):
+    def closure_command():
+        command(*args, **kwargs)
+
+    return closure_command
