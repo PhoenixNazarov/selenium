@@ -1,5 +1,6 @@
 from modules.TypesAction import Error, Save, Status, Stack
 from modules.UI.Settings import *
+from modules.Objects import WebDriverBunch
 
 # ✅🟢 ▶️ ⚙️ ❌✅  🔴🟢
 height_main = 700
@@ -98,8 +99,8 @@ class CanvasUI:
         self.offset = [0]
         self.separators = []
 
-    def get_worker_config(self):
-        return self.Error, self.Save, self.Status, self.Stack, self.number_name
+    def create_worker_config(self):
+        return WebDriverBunch(self.Error, self.Save, self.Status, self.Stack, self.number_name)
 
     def place_line(self, line, *args, **kwargs):
         return self.LineButtonUI(self.canvas, self.offset, self.separators, line, *args, **kwargs)

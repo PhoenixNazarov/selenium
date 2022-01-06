@@ -29,7 +29,7 @@ class Control:
         canvas = self.UI.make_root()
         for numb in range(COUNT_GROUPS):
             canvas[numb].Stack.load_lines(line_groups[numb])
-            worker = Worker(*canvas[numb].get_worker_config(), self.Sheets['Main'])
+            worker = Worker(canvas[numb].create_worker_config(), self.Sheets['Main'])
             if len(line_groups[numb].get_lines()) > 0:
                 worker.polling()
 

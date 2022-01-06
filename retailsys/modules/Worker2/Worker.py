@@ -6,7 +6,10 @@ import threading
 from config import *
 from modules.exception.Handlers import *
 from modules.Line import Line
-from modules.Data import SettingsJson, Log, ErrorsSheetBase, ErrorsSheetCollect
+from modules.data.JsonSettings import SettingsJson
+from modules.data.Sheets import ErrorsSheetBase, ErrorsSheetCollect
+from modules.data.Log import Log
+from modules.Worker2 import MyWebDriver
 
 
 @mail_exception
@@ -140,7 +143,7 @@ class Worker(Log):
                     pass
                 return False
 
-    def error_checker(self, function):
+    def UI_control(self, function):
         error_api = self.Error
         status_api = self.Status
 
@@ -169,6 +172,14 @@ class Worker(Log):
                         continue
             # next
             return False
+
+        return wrapper
+
+    def finder_error(self, function):
+        def wrapper(*args, **kwargs):
+            errors = ["invalid-feedback"]
+            for i in errors:
+                self.web_driver.find_elements(By.CLASS_NAME, "invalid-feedback")
 
         return wrapper
 
@@ -207,24 +218,26 @@ class Worker(Log):
             "element_finder": 0 if element_finder is None else 1
         }), self.numb)
 
+    @UI_control
+    @finder_error
+    def pull(self, function):
+        function()
+
     @elements_exception
     def plan(self, line: Line):
         wd = self.web_driver
         ts = self.time_sleep
 
-        @self.error_checker
         def open_link():
             wd.get('https://retailsys.hotnet.net.il/HotMobile/HMPurchase')
             ts(2, can_skip = True)
 
         # CHOOSE PLANS
-        @self.error_checker
         def choose_plans():
             plans_type = ts(0.5, lambda: wd.find_elements(By.CLASS_NAME, 'plan-type'))
             plans_type[PLAN_TYPE].find_element(By.XPATH, '..').click()
 
         # CARD
-        @self.error_checker
         def button_card():
             all_cards = ts(0.5, lambda: wd.find_elements(By.CLASS_NAME, 'card-title'))
             for ci in all_cards:
@@ -233,8 +246,8 @@ class Worker(Log):
                     but.find_element(By.CLASS_NAME, 'btn').click()
 
         # CHECK ON REG
-        @self.error_checker
         def check_on_reg():
+            global TYPE_USER
             if i == 0:
                 # LEFT_BUTTON
                 dialog = ts(2, lambda: wd.find_element(By.TAG_NAME, 'client-eligibility'))
@@ -246,7 +259,7 @@ class Worker(Log):
                 dialog.find_elements(By.TAG_NAME, 'button')[0].click()
                 ts(2, can_skip = False)
 
-                type_user = 'undefined'
+                TYPE_USER = 'undefined'
                 # error
                 if self.have_elements("invalid-feedback"):
                     raise
@@ -255,7 +268,7 @@ class Worker(Log):
                 try:
                     if len(wd.find_elements(By.NAME, 'clientPhoneNumber')) == 1:
                         # clientPhoneNumber
-                        type_user = 'already'
+                        TYPE_USER = 'already'
                 except:
                     pass
 
@@ -263,36 +276,35 @@ class Worker(Log):
                 try:
                     if 'ללקוח זה נמצאה הזמנה פעילה, האם ברצונך להמשיך?' in wd.find_element(By.TAG_NAME, 
                             'client-eligibility').text:
-                        type_user = 'button'
+                        TYPE_USER = 'button'
                 except:
                     pass
 
                 # new
                 try:
                     if len(wd.find_elements(By.NAME, 'clientId')) != 1:
-                        type_user = 'new'
+                        TYPE_USER = 'new'
                 except:
                     pass
-
-                if type_user == 'already':
+                TYPE_USER = '123'
+                if TYPE_USER == 'already':
                     wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
                     wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
                     dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
                     dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
-                if type_user == 'button':
+                if TYPE_USER == 'button':
                     dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
                     dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
                     wd.find_element(By.NAME, 'clientPhoneNumber').send_keys(line.NUMBER_USER)
                     wd.find_element(By.NAME, 'clientLastFourDigits').send_keys(line.CARD[-4:])
                     dialogs = wd.find_element(By.TAG_NAME, 'client-eligibility')
                     dialogs.find_elements(By.TAG_NAME, 'button')[0].click()
-                    type_user = 'already'
-                return type_user
+                    TYPE_USER = 'already'
+                return TYPE_USER
 
         # ===========OPTIONS PAGE
 
         # 1first_table,2second options
-        @self.error_checker
         def marking_options():
             options = ts(2, lambda: wd.find_elements(By.CLASS_NAME, 'desing-radios'))
             for u in options:
@@ -301,7 +313,6 @@ class Worker(Log):
                     ts(0.01, can_skip = True)
 
         # 3third_table number
-        @self.error_checker
         def enter_number():
             table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'portability-comp'))
             labels = table.find_elements(By.TAG_NAME, 'label')
@@ -326,7 +337,6 @@ class Worker(Log):
                 labels[0].click()
 
         # 5fifth_table tab enter
-        @self.error_checker
         def mark_last_params():
             table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'regulations-comp'))
             rows = table.find_elements(By.CLASS_NAME, "form-group")[1:]
@@ -342,7 +352,6 @@ class Worker(Log):
                 ts(0.01, can_skip = True)
 
         # ACTION
-        @self.error_checker
         def end_action():
             table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'purchase-summary'))
 
@@ -368,7 +377,6 @@ class Worker(Log):
                             ts(0.01, can_skip = True)
 
         # AFTER PACKETS
-        @self.error_checker
         def enter_email():
             table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'interactive-forms'))
             lbs = table.find_elements(By.TAG_NAME, 'label')
@@ -379,7 +387,6 @@ class Worker(Log):
             wd.find_element(By.CLASS_NAME, 'continue').click()
 
         # MAILING DATA
-        @self.error_checker
         def enter_mailing_data():
             table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
             if table.find_element(By.NAME, 'Phone').get_attribute('value') == '':
@@ -399,7 +406,6 @@ class Worker(Log):
             table.find_element(By.NAME, 'LastName').send_keys(line.SURNAME)
 
         # CITY, ADDRESS
-        @self.error_checker
         def enter_address():
             table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
             for ii in range(2):
@@ -434,7 +440,6 @@ class Worker(Log):
                     ts(1, can_skip = False)
 
         # PERS DATA
-        @self.error_checker
         def enter_more_data():
             table = ts(0.5, lambda: wd.find_element(By.TAG_NAME, 'app-personaldetails'))
             if table.find_element(By.NAME, 'HouseNumber').get_attribute('value') == '':
@@ -448,7 +453,6 @@ class Worker(Log):
             wd.find_element(By.CLASS_NAME, 'continue').click()
 
         # DROP CITY,ADDR
-        @self.error_checker
         def enter_more_data2():
             table = ts(2, lambda: wd.find_element(By.TAG_NAME, 'retail-deliverytype'))
             for ii in range(2):
@@ -492,7 +496,6 @@ class Worker(Log):
             ts(2, lambda: wd.find_element(By.CLASS_NAME, 'continue')).click()
 
         # CARD
-        @self.error_checker
         def enter_card():
             table = ts(1, lambda: wd.find_element(By.TAG_NAME, 'payemnt-comp'))
             if TYPE_USER == 'already':
@@ -513,7 +516,6 @@ class Worker(Log):
                 u.click()
 
         # SAVE
-        @self.error_checker
         def save():
             ts(1, lambda: wd.find_element(By.CLASS_NAME, 'continue')).click()
             boxes = ts(1, lambda: wd.find_elements(By.CLASS_NAME, 'box'))
@@ -536,28 +538,36 @@ class Worker(Log):
 
         # ========== SCENARIO ==========
         if open_link(): return
-
         TYPE_USER = 'undefined'
+
+        WriteLines = [
+            choose_plans,
+            button_card,
+            check_on_reg,
+            marking_options,
+            enter_number,
+            mark_last_params,
+            end_action
+        ]
+        PersonalData = [
+            enter_email,
+            enter_mailing_data,
+            enter_address,
+            enter_more_data,
+            enter_more_data2,
+            enter_card
+        ]
+
+        # lines
         for i in range(line.COUNT_LINES):
             PLAN_NAME, NAME_CARD, PLAN_TYPE, ND_OPTION, NUMBER = line.PLANS[i].values()
 
-            if choose_plans(): return
-            if enter_card(): return
+            for func in WriteLines:
+                if func(): return
 
-            TYPE_USER = check_on_reg()
-            if TYPE_USER: return
-
-            if marking_options(): return
-            if enter_number(): return
-            if mark_last_params(): return
-            if end_action(): return
-
-        if enter_email(): return
-        if enter_mailing_data(): return
-        if enter_address(): return
-        if enter_more_data(): return
-        if enter_more_data2(): return
-        if enter_card(): return
+        # after lines
+        for func in PersonalData:
+            if func(): return
 
         self.Status.set_status("end")
         self.Save.change_position(1, "finish")

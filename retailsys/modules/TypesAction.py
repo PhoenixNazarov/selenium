@@ -51,7 +51,7 @@ class Save:
     def wait_command(self):
         prev = self.type
         while self.type == prev:
-            pass
+            time.sleep(0.1)
         if self.type == 'save':
             return 1
         return 0
@@ -137,7 +137,7 @@ class Stack:
 
     def wait_line(self):
         while len(self.__stack) == 0:
-            pass
+            time.sleep(0.1)
         line_index = self.__stack.pop(0)
         self.__run_index = line_index
         self.__reload_lines_ui()

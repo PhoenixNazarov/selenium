@@ -3,6 +3,11 @@ class SmsExceptions(Exception):
         self.msg = 'Ошибка с получением sms'
 
 
+class NeedOperateUI(Exception):
+    def __init__(self):
+        self.msg = f'Произошла ошибка'
+
+
 class InvalidMail(SmsExceptions):
     def __init__(self, gmail, numb):
         self.msg = f'Неправильные данные для аккаунта: {gmail}'
@@ -29,3 +34,5 @@ class FinderTooTime(Exception):
         self.msg = f'Превышено время ожидания для поиска элемента <{time}'
 
 # <div _ngcontent-xrp-c4="" class="invalid-feedback"><!----><span _ngcontent-xrp-c4="">המספר שהוזן אינו תואם</span></div>
+
+
