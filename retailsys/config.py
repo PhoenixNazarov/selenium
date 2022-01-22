@@ -1,6 +1,4 @@
-import time
 import json
-
 with open(r'.settings', 'r') as file:
     out = json.loads(file.read())
 
@@ -30,7 +28,7 @@ LOGGING = out['LOGGING']
 LINE_MATCHER = {
     "COUNT_LINES": "S",
     "PLANS_name": "V",
-    "PLANS_number" : "G",
+    "PLANS_number": "G",
     "PASSPORT": "D",
     "NAME": "E",
     "SURNAME": "Z",
@@ -45,10 +43,3 @@ LINE_MATCHER = {
     "first_sort_key": "P",
     "second_sort_key": "M"
 }
-
-
-def closure(command, *args, **kwargs):
-    def closure_command():
-        command(*args, **kwargs)
-
-    return closure_command

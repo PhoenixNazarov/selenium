@@ -1,15 +1,13 @@
-from tkinter import messagebox
-from awesometkinter.bidirender import add_bidi_support
 from tkinter import *
-
-from config import *
-from modules.data.JsonSettings import SettingsJson, SettingsMain
+from awesometkinter.bidirender import add_bidi_support
+from modules.data import SettingsJson, SettingsMain
+from modules.exception.Handlers import check_valid_values
 
 
 class CanvasMainSettings(Tk):
     def __init__(self):
         super().__init__()
-        self.Settings = SettingsMain()
+        self.Settings = SettingsMain
         self.variables = {}
 
         keys = self.Settings.get_keys()
@@ -101,22 +99,7 @@ class CanvasMainSettings(Tk):
         btn_settings.place(x = 120, y = up + 50, width = 60, height = 20)
 
     def save(self):
-        paths = []
-        data = {}
-
-        # is valid values
-        for i in self.variables:
-            if self.variables[i].get() == '':
-                messagebox.showerror("Ошибка", 'Не должно быть пустых строк\n' + i)
-                return
-            if 'PATH' in i or "DIR" in i:
-                if self.variables[i].get() in paths:
-                    messagebox.showerror("Ошибка", 'Не должно быть одинаковых путей\n' + i)
-                    return
-                else:
-                    paths.append(self.variables[i].get())
-            data.update({i: self.variables[i].get()})
-
+        data = check_valid_values(self.variables)
         self.Settings.save(data)
         self.destroy()
 

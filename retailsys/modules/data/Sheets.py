@@ -1,5 +1,4 @@
 from config import *
-from modules.Line import Line
 from openpyxl import load_workbook
 
 
@@ -30,11 +29,17 @@ class Sheet:
         return self.sheet[f'{column}{line}'].value
 
     def set_value(self, column, line, val):
-        print(column, line, val)
         self.sheet[f'{column}{line}'].value = val
 
-    def save(self):
+    def _save(self):
         self._wb.save(self.path)
+
+    def close(self):
+        self._save()
+
+    def open(self):
+        self._wb = load_workbook(self.path)
+        self.sheet = self._wb.active
 
     def __getitem__(self, item):
         return self.get_value(item, '')
@@ -54,15 +59,6 @@ class MainSheet(Sheet):
             return self.get_value("P", line_index)
         if name == "second_sort_key":
             return self.get_value("M", line_index)
-
-    def get_lines(self):
-        lines = []
-        line_index = 2
-        while self.get_value("S", line_index):
-            line = Line(self, line_index)
-            lines.append(line)
-            line_index += line.COUNT_LINES
-        return lines
 
     def get_sorted_lines(self, sort_keys):
         sorted_lines = []
@@ -143,12 +139,13 @@ class ErrorsSheetBase(Sheet):
 class ErrorsSheetCollect(Sheet):
     def __init__(self):
         super().__init__(PATH_COLLECT_ERRORS_SHEET)
-        self.index = 2
+        self.index = 1
         while self.get_value("A", self.index):
             self.index += 1
 
     def write_error(self, error, data=""):
-        self.set_value("A", self.index, error['replace'])
+        self.open()
+        self.set_value("A", self.index, error)
         self.set_value("B", self.index, data)
-        self.save()
+        self.close()
         self.index += 1

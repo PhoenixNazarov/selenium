@@ -72,6 +72,20 @@ def mail_exception(func):
     return wrapper
 
 
+def plans_exception(func):
+    def wrapper(*args, **kwarg):
+        try:
+            return func(*args, **kwarg)
+        except BreakScenario as e:
+            return
+        except FinderTooTime as e:
+            messagebox.showerror("Ошибка поиска по времени", e.msg)
+        except Exception as e:
+            raise e
+
+    return wrapper
+
+
 def elements_exception(func):
     def wrapper(*args, **kwarg):
         password = args[0]
@@ -87,3 +101,22 @@ def elements_exception(func):
             raise e
 
     return wrapper
+
+
+def check_valid_values(variables):
+    paths = []
+    data = {}
+
+    # is valid values
+    for i in variables:
+        if variables[i].get() == '':
+            messagebox.showerror("Ошибка", 'Не должно быть пустых строк\n' + i)
+            return
+        if 'PATH' in i or "DIR" in i:
+            if variables[i].get() in paths:
+                messagebox.showerror("Ошибка", 'Не должно быть одинаковых путей\n' + i)
+                return
+            else:
+                paths.append(variables[i].get())
+        data.update({i: variables[i].get()})
+    return data

@@ -14,7 +14,7 @@ class InvalidMail(SmsExceptions):
 
 
 class NotAllowedMail(SmsExceptions):
-    def __init__(self, gmail, numb, url):
+    def __init__(self, gmail, numb):
         self.url = 'https://support.google.com/mail/accounts/answer/78754'
         self.msg = f'Нет разрешений использовать этот аккаунт: {gmail}' + '\n' + self.url
 
@@ -32,6 +32,12 @@ class DataLoadError(Exception):
 class FinderTooTime(Exception):
     def __init__(self, numb, time):
         self.msg = f'Превышено время ожидания для поиска элемента <{time}'
+
+
+class BreakScenario(Exception):
+    def __init__(self):
+        pass
+
 
 # <div _ngcontent-xrp-c4="" class="invalid-feedback"><!----><span _ngcontent-xrp-c4="">המספר שהוזן אינו תואם</span></div>
 

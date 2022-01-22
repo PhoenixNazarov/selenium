@@ -1,5 +1,6 @@
-from modules.TypesAction import Error, Save, Status, Stack
+from modules.UI.TypesAction import *
 from modules.UI.Settings import *
+from config import *
 
 # ✅🟢 ▶️ ⚙️ ❌✅  🔴🟢
 height_main = 700
@@ -136,7 +137,7 @@ class CanvasUI:
         return CanvasWorkerSettings(btn_settings, self.number_name)
 
 
-class UI(Tk):
+class Window(Tk):
     def __init__(self):
         super().__init__(screenName = 'retailsys', className = 'retailsys')
 

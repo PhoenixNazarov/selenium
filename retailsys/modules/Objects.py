@@ -28,11 +28,12 @@ class Memory:
 
     def check_allow(self, name):
         if any([i(name) for i in self.disallow_rules]):
+            print('disallow', [i(name) for i in self.disallow_rules])
             return 0
         return 1
 
-    def need_write(self, name, val):
-        if name == 'end_action':
-            self.COPY = val
-        elif name == 'check_on_reg':
-            self.TYPE_USER = val
+    def need_write(self, name, res):
+        if name == 'check_on_reg':
+            self.TYPE_USER = res
+        elif name == 'end_action':
+            self.COPY = res
